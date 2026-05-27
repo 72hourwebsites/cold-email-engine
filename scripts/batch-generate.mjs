@@ -12,9 +12,9 @@ const require = createRequire(import.meta.url);
 const Papa = require("papaparse");
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const CSV_PATH = "C:/Users/aml25/Downloads/leadrocks_owner_restaurants_51926_2026_05_20.csv";
-const OUTPUT_JSON = "C:/Users/aml25/Downloads/cold-email-app/scripts/generated-emails.json";
-const OUTPUT_CSV  = "C:/Users/aml25/Downloads/cold-email-reachinbox-final.csv";
+const CSV_PATH = process.env.INPUT_CSV || "./data/leads.csv";
+const OUTPUT_JSON = process.env.GENERATED_JSON || "./scripts/generated-emails.json";
+const OUTPUT_CSV  = process.env.REACHINBOX_OUTPUT || "./cold-email-reachinbox-final.csv";
 const API_URL = "http://localhost:3001/api/generate";
 const CONCURRENCY = 3;  // Claude Haiku handles 3 parallel fine
 

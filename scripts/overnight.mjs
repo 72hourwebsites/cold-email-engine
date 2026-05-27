@@ -9,9 +9,9 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const Papa = require("papaparse");
 
-const CSV        = "C:/Users/aml25/Downloads/leadrocks_owner_restaurants_51926_2026_05_20.csv";
-const PROGRESS   = "C:/Users/aml25/Downloads/cold-email-app/scripts/overnight-progress.json";
-const EXPORT     = "C:/Users/aml25/Downloads/cold-email-reachinbox-FINAL.csv";
+const CSV        = process.env.INPUT_CSV || "./data/leads.csv";
+const PROGRESS   = process.env.OVERNIGHT_PROGRESS || "./scripts/overnight-progress.json";
+const EXPORT     = process.env.REACHINBOX_OUTPUT || "./cold-email-reachinbox-FINAL.csv";
 const GEMMA_URL  = "http://192.168.4.59:1234/v1/chat/completions";
 const GEMMA_MODEL = "google/gemma-4-e4b";
 

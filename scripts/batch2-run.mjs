@@ -16,9 +16,8 @@
  * Re-running picks up where it left off.
  *
  * OUTPUT:
- *   C:/Users/aml25/Downloads/cold-email-reachinbox-batch2-PRODUCTION.csv  ← import this
- *   C:/Users/aml25/Downloads/cold-email-reachinbox-batch2-REJECTED.csv
- *   C:/Users/aml25/Downloads/cold-email-reachinbox-batch2-DROPPED.csv
+ *   Set env vars: REACHINBOX_OUTPUT, REJECTED_OUTPUT, DROPPED_OUTPUT
+ *   (defaults: ./cold-email-reachinbox-batch2-PRODUCTION.csv, etc.)
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
@@ -38,18 +37,20 @@ if (!existsSync(INPUT_CSV)) {
 }
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_KEY) {
+if (!OPENAI_KEY && (process.env.LLM_PROVIDER || "openai") === "openai") {
   console.error("Missing OPENAI_API_KEY env var");
-  console.error("Set it from your Cold Caller .env:");
-  console.error('  $env:OPENAI_API_KEY = (Get-Content "C:/Claude/Cold Caller/.env" | Select-String "^OPENAI_API_KEY" | ForEach-Object { $_.ToString().Split("=",2)[1] })');
   process.exit(1);
 }
-const REOON_KEY = process.env.REOON_API_KEY || "6hRql21Je1j0MoArXbChCEl9mgUZAbAW";
+const REOON_KEY = process.env.REOON_API_KEY;
+if (!REOON_KEY) {
+  console.error("Missing REOON_API_KEY env var — set it in .env");
+  process.exit(1);
+}
 
 // Already-shipped emails (don't double-message anyone from Batch #1)
-const BATCH1_PROD = "C:/Users/aml25/Downloads/cold-email-reachinbox-PRODUCTION.csv";
+const BATCH1_PROD = process.env.PREVIOUS_BATCH;
 
-const STATE_DIR = "C:/Users/aml25/Downloads/cold-email-app/scripts/batch2-state";
+const STATE_DIR = process.env.STATE_DIR || "./scripts/batch2-state";
 if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
 
 const ELIGIBLE_FILE = `${STATE_DIR}/01-eligible.json`;
@@ -57,9 +58,9 @@ const DAY0_FILE     = `${STATE_DIR}/02-day0.json`;
 const SEQ_FILE      = `${STATE_DIR}/03-sequence.json`;
 const VERIFY_CACHE  = `${STATE_DIR}/04-reoon-cache.json`;
 
-const OUT_PROD   = "C:/Users/aml25/Downloads/cold-email-reachinbox-batch2-PRODUCTION.csv";
-const OUT_REJECT = "C:/Users/aml25/Downloads/cold-email-reachinbox-batch2-REJECTED.csv";
-const OUT_DROP   = "C:/Users/aml25/Downloads/cold-email-reachinbox-batch2-DROPPED.csv";
+const OUT_PROD   = process.env.REACHINBOX_OUTPUT || "./cold-email-reachinbox-batch2-PRODUCTION.csv";
+const OUT_REJECT = process.env.REJECTED_OUTPUT || "./cold-email-reachinbox-batch2-REJECTED.csv";
+const OUT_DROP   = process.env.DROPPED_OUTPUT || "./cold-email-reachinbox-batch2-DROPPED.csv";
 
 const MODEL        = "gpt-4o-mini";
 const GEN_CONCURRENCY = 10;

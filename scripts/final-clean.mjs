@@ -7,9 +7,9 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const Papa = require("papaparse");
 
-const SAFE_IN  = "C:/Users/aml25/Downloads/cold-email-reachinbox-FINAL-SAFE.csv";
-const SAFE_OUT = "C:/Users/aml25/Downloads/cold-email-reachinbox-PRODUCTION.csv";
-const DROPPED  = "C:/Users/aml25/Downloads/cold-email-reachinbox-DROPPED.csv";
+const SAFE_IN  = process.env.FINAL_SAFE_OUTPUT || "./cold-email-reachinbox-FINAL-SAFE.csv";
+const SAFE_OUT = process.env.REACHINBOX_OUTPUT || "./cold-email-reachinbox-PRODUCTION.csv";
+const DROPPED  = process.env.DROPPED_OUTPUT || "./cold-email-reachinbox-DROPPED.csv";
 
 // All Unicode smart-typography → ASCII
 function normalize(s){

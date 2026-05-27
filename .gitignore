@@ -1,10 +1,46 @@
-node_modules/
-.next/
-*.log
-scripts/*.log
-scripts/batch2-state/
-scripts/overnight-progress.json
-scripts/sequence-progress.json
+# dotenv
 .env
 .env.local
+.env.development
+.env.production
+
+# dependencies
+node_modules/
+
+# build
+.next/
+out/
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
 tsconfig.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+
+# Script state / checkpoints (these contain generated emails — don't commit)
+scripts/batch2-state/
+scripts/*-progress.json
+scripts/*-cache.json
+scripts/generated-emails.json
+scripts/*.json
+
+# output CSVs (generated data)
+cold-email-reachinbox-*.csv
+cold-email-reachinbox-*.CSV
+*.REJECTED.csv
+*.DROPPED.csv

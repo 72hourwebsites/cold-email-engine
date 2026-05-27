@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const Papa = require("papaparse");
 
 const INPUT = process.argv[2];
-const BATCH1 = "C:/Users/aml25/Downloads/cold-email-reachinbox-PRODUCTION.csv";
+const BATCH1 = process.env.REACHINBOX_OUTPUT || "./cold-email-reachinbox-PRODUCTION.csv";
 
 if (!INPUT) { console.error("Usage: node scripts/batch2-prescan.mjs <csv>"); process.exit(1); }
 

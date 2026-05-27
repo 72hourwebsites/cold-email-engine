@@ -11,9 +11,9 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const Papa = require("papaparse");
 
-const CSV = "C:/Users/aml25/Downloads/leadrocks_owner_restaurants_51926_2026_05_20.csv";
-const D0_FILE = "C:/Users/aml25/Downloads/cold-email-app/scripts/overnight-progress.json";
-const SEQ_FILE = "C:/Users/aml25/Downloads/cold-email-app/scripts/sequence-progress.json";
+const CSV = process.env.INPUT_CSV || "./data/leads.csv";
+const D0_FILE = process.env.OVERNIGHT_PROGRESS || "./scripts/overnight-progress.json";
+const SEQ_FILE = process.env.SEQ_PROGRESS || "./scripts/sequence-progress.json";
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
 const FIXES = [

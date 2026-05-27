@@ -11,16 +11,20 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const Papa = require("papaparse");
 
-const CSV       = "C:/Users/aml25/Downloads/leadrocks_owner_restaurants_51926_2026_05_20.csv";
-const D0_FILE   = "C:/Users/aml25/Downloads/cold-email-app/scripts/overnight-progress.json";
-const SEQ_FILE  = "C:/Users/aml25/Downloads/cold-email-app/scripts/sequence-progress.json";
-const VERIFY_CACHE = "C:/Users/aml25/Downloads/cold-email-app/scripts/reoon-cache.json";
-const OUT_ALL   = "C:/Users/aml25/Downloads/cold-email-reachinbox-FINAL-ALL.csv";
-const OUT_SAFE  = "C:/Users/aml25/Downloads/cold-email-reachinbox-FINAL-SAFE.csv";
-const OUT_REJECT= "C:/Users/aml25/Downloads/cold-email-reachinbox-REJECTED.csv";
+const CSV       = process.env.INPUT_CSV || "./data/leads.csv";
+const D0_FILE   = process.env.OVERNIGHT_PROGRESS || "./scripts/overnight-progress.json";
+const SEQ_FILE  = process.env.SEQ_PROGRESS || "./scripts/sequence-progress.json";
+const VERIFY_CACHE = process.env.REOON_CACHE || "./scripts/reoon-cache.json";
+const OUT_ALL   = process.env.FINAL_ALL_OUTPUT || "./cold-email-reachinbox-FINAL-ALL.csv";
+const OUT_SAFE  = process.env.FINAL_SAFE_OUTPUT || "./cold-email-reachinbox-FINAL-SAFE.csv";
+const OUT_REJECT= process.env.REJECTED_OUTPUT || "./cold-email-reachinbox-REJECTED.csv";
 
-const REOON_KEY = "6hRql21Je1j0MoArXbChCEl9mgUZAbAW";
-const REOON_MODE = "quick"; // quick = ~1s, power = ~10s. quick is fine for batch.
+const REOON_KEY = process.env.REOON_API_KEY;
+if (!REOON_KEY) {
+  console.error("Missing REOON_API_KEY — set it in .env");
+  process.exit(1);
+}
+const REOON_MODE = "power";
 const VERIFY_CONCURRENCY = 1;
 const VERIFY_DELAY_MS = 1300; // Reoon single-call rate limit
 

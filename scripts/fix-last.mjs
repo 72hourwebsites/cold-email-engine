@@ -4,8 +4,8 @@ const require = createRequire(import.meta.url);
 const Papa = require("papaparse");
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const PROD = "C:/Users/aml25/Downloads/cold-email-reachinbox-PRODUCTION.csv";
-const D0_FILE = "C:/Users/aml25/Downloads/cold-email-app/scripts/overnight-progress.json";
+const PROD = process.env.REACHINBOX_OUTPUT || "./cold-email-reachinbox-PRODUCTION.csv";
+const D0_FILE = process.env.OVERNIGHT_PROGRESS || "./scripts/overnight-progress.json";
 
 async function gen() {
   const prompt = `Write a cold email for Matt, Owner at Corner Pub Of Chinatown in Canton, Massachusetts.

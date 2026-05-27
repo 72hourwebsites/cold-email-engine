@@ -15,15 +15,20 @@ export interface ReoonResult {
   error?: string;
 }
 
+function getKey(apiKey?: string): string | null {
+  return apiKey || process.env.REOON_API_KEY || process.env.NEXT_PUBLIC_REOON_API_KEY || null;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { email, apiKey, mode = "quick" } = await req.json();
+    const { email, apiKey, mode = "power" } = await req.json();
+    const key = getKey(apiKey);
 
-    if (!email || !apiKey) {
-      return NextResponse.json({ error: "email and apiKey required" }, { status: 400 });
+    if (!email || !key) {
+      return NextResponse.json({ error: "email and apiKey required (or set REOON_API_KEY env var)" }, { status: 400 });
     }
 
-    const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&key=${encodeURIComponent(apiKey)}&mode=${mode}`;
+    const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&key=${key}key=${key}&mode=${mode}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(25_000) });
 
     if (!res.ok) {
@@ -39,13 +44,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Bulk verify — runs multiple emails concurrently
 export async function PUT(req: NextRequest) {
   try {
-    const { emails, apiKey, mode = "quick", concurrency = 5 } = await req.json();
+    const { emails, apiKey, mode = "power", concurrency = 5 } = await req.json();
+    const key = getKey(apiKey);
 
-    if (!emails?.length || !apiKey) {
-      return NextResponse.json({ error: "emails array and apiKey required" }, { status: 400 });
+    if (!emails?.length || !key) {
+      return NextResponse.json({ error: "emails array and apiKey required (or set REOON_API_KEY env var)" }, { status: 400 });
     }
 
     const results: Record<string, ReoonResult | { error: string }> = {};
@@ -53,7 +58,7 @@ export async function PUT(req: NextRequest) {
 
     async function verifyOne(email: string) {
       try {
-        const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&key=${encodeURIComponent(apiKey)}&mode=${mode}`;
+        const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&key=${key}key=${key}&mode=${mode}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
         if (!res.ok) { results[email] = { error: `HTTP ${res.status}` }; return; }
         results[email] = await res.json();

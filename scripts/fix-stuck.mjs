@@ -23,7 +23,7 @@ No brackets remaining. No greeting. No sign-off.`;
   return (await res.json()).choices?.[0]?.message?.content || "";
 }
 
-const seq = JSON.parse(readFileSync("C:/Users/aml25/Downloads/cold-email-app/scripts/sequence-progress.json","utf8"));
+const seq = JSON.parse(readFileSync(process.env.SEQ_PROGRESS || "./scripts/sequence-progress.json","utf8"));
 const seqMap = new Map(seq.map((x,i)=>[x.rowIndex,i]));
 
 const targets = [
@@ -54,5 +54,5 @@ for(const t of targets){
   }
   if(!saved) console.log(`⚠️ row ${t.rowIndex} stuck after 5 attempts`);
 }
-writeFileSync("C:/Users/aml25/Downloads/cold-email-app/scripts/sequence-progress.json", JSON.stringify(seq,null,2));
+writeFileSync(process.env.SEQ_PROGRESS || "./scripts/sequence-progress.json", JSON.stringify(seq,null,2));
 console.log("Done.");

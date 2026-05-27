@@ -136,7 +136,7 @@ Your warmed mailboxes are already eligible to send Batch #2 the moment the impor
 
 **"Input CSV not found"** — check the path; use forward slashes or double-quoted Windows paths.
 
-**Reoon returning lots of `api_error`** — the script auto-retries with 15s backoff up to 4×. If still failing, your Reoon quota may be exhausted — check your dashboard. Hardcoded key in the script: `6hRql21Je1j0MoArXbChCEl9mgUZAbAW`. To use a different key, set `$env:REOON_API_KEY` before running.
+**Reoon returning lots of `api_error`** — the script auto-retries with 15s backoff up to 4×. If still failing, your Reoon quota may be exhausted — check your dashboard. The key is read from `REOON_API_KEY` in `.env`. Ensure it's set before running.
 
 **Day 0 QA fail rate >10%** — likely a weird CSV (non-restaurant rows, non-US locations, missing First Name). Open `02-day0.json` and inspect the `ok:false` entries; usually the row data is the issue, not the prompt.
 
