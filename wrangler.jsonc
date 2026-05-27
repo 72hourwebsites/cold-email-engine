@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"main": ".open-next/worker.js",
-	"name": "cold-email-app",
+	"name": "cold-email-engine",
 	"compatibility_date": "2026-05-27",
 	"compatibility_flags": [
 		"nodejs_compat",
@@ -16,7 +16,7 @@
 			// Self-reference service binding, the service name must match the worker name
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "cold-email-app"
+			"service": "cold-email-engine"
 		}
 	],
 	"images": {
