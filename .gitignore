@@ -7,3 +7,4 @@ scripts/overnight-progress.json
 scripts/sequence-progress.json
 .env
 .env.local
+tsconfig.tsbuildinfo
