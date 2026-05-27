@@ -4,6 +4,23 @@ import OpenAI from "openai";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// ─── STEP-TO-MODEL TIERING (Phase 2) ─────────────────────────────────────────
+// Maps each email step to the recommended model/provider type.
+// Actual providers configured in Phase 3 — here we define the routing logic.
+
+const STEP_MODEL_MAP: Record<string, { recommended: string; fallback: string; minTokens: number; temp: number }> = {
+  step1: { recommended: "deepseek", fallback: "gpt4o", minTokens: 350, temp: 0.75 },
+  step2: { recommended: "gpt4o", fallback: "deepseek", minTokens: 400, temp: 0.7 },
+  step3: { recommended: "deepseek", fallback: "gpt4o", minTokens: 350, temp: 0.72 },
+  step4: { recommended: "minifast", fallback: "gpt4o", minTokens: 250, temp: 0.65 },
+};
+
+// ─── BAN LIST (fast client-side check before quality gate) ────────────────────
+
+const BANNED_PREFIXES = [
+  /^(boost|elevate|unlock|transform|maximize|supercharge|enhance|optimize)/i,
+];
+
 // ─── ROUND-ROBIN COUNTER ──────────────────────────────────────────────────────
 // Cycles through providers to spread load and avoid rate limits
 let providerIdx = 0;
@@ -129,8 +146,12 @@ async function callProvider(prompt: string, systemPrompt: string, p: Provider, m
 export async function POST(req: NextRequest) {
   try {
     const { prompt, systemPrompt, config } = await req.json();
-    const maxTokens = config.maxTokens ?? 400;
-    const temp = config.temperature ?? 0.72;
+    const step = config.step || "step1";
+
+    // Step-aware model tiering
+    const stepConfig = STEP_MODEL_MAP[step] || STEP_MODEL_MAP.step1;
+    const maxTokens = config.maxTokens ?? stepConfig.minTokens;
+    const temp = config.temperature ?? stepConfig.temp;
 
     const providers = buildProviders(config);
     if (providers.length === 0) {
@@ -167,26 +188,35 @@ export async function POST(req: NextRequest) {
     }
 
     let { subject, body } = parseEmailOutput(raw);
-    const issue = qualityIssue(subject, body);
 
-    // Auto-retry on banned subject (same provider, slightly higher temp)
-    if (issue?.startsWith("banned_start") || issue === "missing_subject") {
+    // Phase 2: quality gate with full ban list + length checks
+    const { qualityGate } = await import("@/lib/prompt");
+    let gate = qualityGate(subject, body);
+
+    // Auto-retry on banned phrases or low-quality output (up to 2 retries)
+    for (let retry = 0; retry < 2 && !gate.pass; retry++) {
+      const fixPrompt = [
+        prompt,
+        "\n\nIMPORTANT: The previous output had issues that MUST be fixed:",
+        ...gate.banned.map(p => `- BANNED PHRASE: "${p}" — DO NOT use this phrase`),
+        ...gate.issues.map(i => `- ISSUE: ${i}`),
+        "Rewrite the entire email now. Follow the format exactly.",
+      ].join("\n");
+
       try {
         const p = providers[startIdx % providers.length];
-        const retryRaw = await callProvider(
-          prompt + "\n\nIMPORTANT: Fix this issue: " + issue + ". Rewrite the email now.",
-          systemPrompt, p, maxTokens, Math.min(temp + 0.1, 1.0)
-        );
+        const retryRaw = await callProvider(fixPrompt, systemPrompt, p, maxTokens, Math.min(temp + 0.1, 1.0));
         const retry = parseEmailOutput(retryRaw);
-        if (!qualityIssue(retry.subject, retry.body)) {
+        gate = qualityGate(retry.subject, retry.body);
+        if (gate.pass) {
           subject = retry.subject;
           body = retry.body;
           raw = retryRaw;
         }
-      } catch { /* use original */ }
+      } catch { /* use last good version */ }
     }
 
-    return NextResponse.json({ subject, body, raw });
+    return NextResponse.json({ subject, body, raw, step, quality: gate });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }

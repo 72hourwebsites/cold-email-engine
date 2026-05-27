@@ -8,6 +8,11 @@ import {
   computeLeadRocksTokens, isLeadRocksCsv, getBestEmail,
   LEADROCKS_VOICE_AI_PROMPT, LEADROCKS_DAY3_PROMPT, LEADROCKS_DAY7_PROMPT, LEADROCKS_DAY14_PROMPT, LEADROCKS_ICEBREAKER_PROMPT,
 } from "./leadrocks";
+import { detectSignal, resolveAngle } from "./signals";
+import {
+  STEP1_VARIANTS, STEP2_VARIANTS, STEP3_VARIANTS, STEP4_VARIANTS,
+  STEP_SYSTEM_PROMPTS,
+} from "./templates";
 
 function getSeason(date: Date): string {
   const m = date.getMonth() + 1;
@@ -429,3 +434,161 @@ export function getServiceTemplates(service: ServiceType, mode: EmailMode): Sequ
 }
 
 export const DEFAULT_EMAIL_TEMPLATE = OUTSCRAPER_VOICE_AI_PROMPT;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 2: BAN LIST ENFORCEMENT + SIGNAL-BASED GENERATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── BANNED PHRASES (post-generation filter) ──────────────────────────────────
+
+const BANNED_PHRASES = [
+  "Imagine",
+  "Worth 15 minutes",
+  "Worth a quick call",
+  "worth your time",
+  "during a bustling",
+  "during the hustle",
+  "14 reservations recovered",
+  "Revolutionary",
+  "Breakthrough",
+  "Game-changing",
+  "I'd love to",
+  "I'm reaching out because",
+  "Hope this finds you well",
+  "I came across your profile",
+  "I wanted to reach out",
+  "Quick question",
+  "I hope this",
+  "Greetings",
+  "quick chat",
+  "hop on a call",
+  "jump on a quick call",
+  "do you have 15 minutes",
+  "I was thinking",
+  "Let me know if you're interested",
+  "seamless",
+  "leverage",
+  "synergy",
+  "enhance",
+  "empower",
+  "streamline",
+  "robust",
+  "game-changing",
+  "cutting-edge",
+  "pain points",
+  "value proposition",
+  "holistic",
+  "innovative",
+  "scalable",
+  "delicious",
+  "amazing",
+  "incredible",
+  // CTA boilerplate
+  "Worth a quick 15-minute call",
+  "Worth 15 min",
+  "15-minute call this week",
+  "quick 15-minute call",
+];
+
+/**
+ * Check a generated email (subject + body) for banned phrases.
+ * Returns the list of banned phrases found, or empty array if clean.
+ */
+export function checkBannedPhrases(subject: string, body: string): string[] {
+  const full = `${subject} ${body}`.toLowerCase();
+  const hits: string[] = [];
+  for (const phrase of BANNED_PHRASES) {
+    if (full.includes(phrase.toLowerCase())) {
+      hits.push(phrase);
+    }
+  }
+  return hits;
+}
+
+/**
+ * Post-generation quality gate.
+ * Returns { pass: true } if clean, or { pass: false, banned: [...] } if caught.
+ */
+export function qualityGate(subject: string, body: string): {
+  pass: boolean;
+  banned: string[];
+  issues: string[];
+} {
+  const issues: string[] = [];
+  const banned = checkBannedPhrases(subject, body);
+
+  if (!subject || subject.length < 4) issues.push("missing_subject");
+  if (!body || body.trim().split(/\s+/).length < 10) issues.push("body_too_short");
+  if (body.length > 800) issues.push("body_too_long");
+
+  return {
+    pass: banned.length === 0 && issues.length === 0,
+    banned,
+    issues,
+  };
+}
+
+/**
+ * Build a signal-based prompt for a specific step and variant.
+ *
+ * @param step — "step1" | "step2" | "step3" | "step4"
+ * @param variant — "A" | "B" | "C" | "D" | "E"
+ * @param row — CSV row data
+ * @param mappings — field mappings for token resolution
+ * @returns The resolved prompt string with all tokens filled
+ */
+export function buildSignalPrompt(
+  step: "step1" | "step2" | "step3" | "step4",
+  variant: "A" | "B" | "C" | "D" | "E",
+  row: CsvRow,
+  mappings: FieldMapping[],
+): { prompt: string; systemPrompt: string; signalType: string } {
+  // Detect the best signal for this row
+  const rowMap: Record<string, string> = {};
+  for (const m of mappings) {
+    if (m.semanticKey && m.csvColumn) {
+      rowMap[m.semanticKey] = row[m.csvColumn] || "";
+    }
+  }
+  // Also pass raw CSV columns
+  for (const [k, v] of Object.entries(row)) {
+    if (!rowMap[k]) rowMap[k] = v;
+  }
+
+  const signal = detectSignal(rowMap);
+  const angle = resolveAngle(signal, rowMap);
+
+  // Get the variant templates
+  const variantMap: Record<string, Record<string, string>> = {
+    step1: STEP1_VARIANTS,
+    step2: STEP2_VARIANTS,
+    step3: STEP3_VARIANTS,
+    step4: STEP4_VARIANTS,
+  };
+
+  const variants = variantMap[step];
+  const template = variants[variant] || variants.A; // fallback to A
+
+  // Build the base prompt with row data
+  const basePrompt = buildPrompt(template, row, mappings);
+
+  // Inject signal tokens
+  const signalTokens: Record<string, string> = {
+    signal_hook: angle.openerHook,
+    signal_pain: angle.painAngle,
+    signal_value: angle.valueProp,
+    signal_type: signal.config.label || signal.type,
+    signal_confidence: String(Math.round(signal.confidence * 100)),
+    cta_style: angle.ctaType,
+  };
+
+  let finalPrompt = basePrompt;
+  for (const [key, val] of Object.entries(signalTokens)) {
+    finalPrompt = finalPrompt.replaceAll(`{{${key}}}`, val || "");
+  }
+
+  // Get the per-step system prompt
+  const systemPrompt = STEP_SYSTEM_PROMPTS[step] || DEFAULT_SYSTEM_PROMPT;
+
+  return { prompt: finalPrompt, systemPrompt, signalType: signal.type };
+}
