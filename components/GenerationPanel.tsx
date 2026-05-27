@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { CsvRow, FieldMapping, GeneratedEmail, GenerationState, EmailMode } from "@/lib/types";
 import { isLeadRocksCsv, getBestEmail } from "@/lib/leadrocks";
+import { analyzeSpamScore, SpamAnalysis } from "@/lib/spam-analyzer";
 
 interface Props {
   csvRows: CsvRow[];
@@ -57,7 +58,7 @@ function toReachInboxCSV(rows: CsvRow[], emails: GeneratedEmail[], mappings: Fie
     ? ["Personalisation_Line", "Subject_Day0", "Body_Day0", "Subject_Day3", "Body_Day3", "Subject_Day7", "Body_Day7", "Subject_Day14", "Body_Day14"]
     : ["Personalisation_Line", "Subject_Day0", "Body_Day0"];
 
-  const allHeaders = [...baseHeaders, ...modeHeaders];
+  const allHeaders = [...baseHeaders, ...modeHeaders, "Recommended_Send_Time"];
   const lines = emails.map(e => {
     const row = rows[e.rowIndex] || {};
     // LeadRocks: best verified email; others: mapped column
@@ -102,7 +103,7 @@ function toReachInboxCSV(rows: CsvRow[], emails: GeneratedEmail[], mappings: Fie
       ];
     }
 
-    return [...base, ...modeVals].join(",");
+    return [...base, ...modeVals, sanitize(recommendedSendTime(emailVal))].join(",");
   });
 
   return [allHeaders.join(","), ...lines].join("\n");
@@ -111,21 +112,25 @@ function toReachInboxCSV(rows: CsvRow[], emails: GeneratedEmail[], mappings: Fie
 function toFullCSV(rows: CsvRow[], emails: GeneratedEmail[], mappings: FieldMapping[], mode: EmailMode): string {
   const csvCols = rows[0] ? Object.keys(rows[0]) : [];
   const extraCols = mode === "sequence"
-    ? ["generated_subject_1", "generated_body_1", "generated_subject_2", "generated_body_2", "generated_subject_3", "generated_body_3", "word_count", "status"]
+    ? ["generated_subject_1", "generated_body_1", "generated_subject_2", "generated_body_2", "generated_subject_3", "generated_body_3", "word_count", "quality", "status", "recommended_send_time"]
     : mode === "icebreaker"
-    ? ["icebreaker", "status"]
-    : ["generated_subject", "generated_body", "word_count", "status"];
+    ? ["icebreaker", "status", "recommended_send_time"]
+    : ["generated_subject", "generated_body", "word_count", "quality", "status", "recommended_send_time"];
 
   const lines = emails.map(e => {
     const row = rows[e.rowIndex] || {};
     const base = csvCols.map(h => sanitize(row[h] || ""));
+    const emailCol = getCol(mappings, "email");
+    const emailVal = row[emailCol] || "";
+    const wc = wordCount(e.body);
+    const quality = !e.error && e.subject && e.body && wc >= 15 && wc <= 200 ? "ok" : "review";
     let extra: string[];
     if (mode === "sequence") {
-      extra = [sanitize(e.subject), sanitize(e.body), sanitize(e.subject2 || ""), sanitize(e.body2 || ""), sanitize(e.subject3 || ""), sanitize(e.body3 || ""), String(wordCount(e.body)), e.error ? "error" : "ok"];
+      extra = [sanitize(e.subject), sanitize(e.body), sanitize(e.subject2 || ""), sanitize(e.body2 || ""), sanitize(e.subject3 || ""), sanitize(e.body3 || ""), String(wc), quality, e.error ? "error" : "ok", sanitize(recommendedSendTime(emailVal))];
     } else if (mode === "icebreaker") {
-      extra = [sanitize(e.icebreaker || e.body), e.error ? "error" : "ok"];
+      extra = [sanitize(e.icebreaker || e.body), quality, e.error ? "error" : "ok", sanitize(recommendedSendTime(emailVal))];
     } else {
-      extra = [sanitize(e.subject), sanitize(e.body), String(wordCount(e.body)), e.error ? "error" : "ok"];
+      extra = [sanitize(e.subject), sanitize(e.body), String(wc), quality, e.error ? "error" : "ok", sanitize(recommendedSendTime(emailVal))];
     }
     return [...base, ...extra].join(",");
   });
@@ -135,6 +140,35 @@ function toFullCSV(rows: CsvRow[], emails: GeneratedEmail[], mappings: FieldMapp
 
 function getFirstName(name: string) {
   return name.trim().split(/\s+/)[0] || name;
+}
+
+// ─── Phase 6.2 — Send-time optimization ──────────────────────────────────────
+// Research: Tuesday-Thursday 9-11 AM prospect local time, ±15min randomization
+function recommendedSendTime(email: string): string {
+  const hash = Array.from(email).reduce((s, c) => s + c.charCodeAt(0), 0);
+  // Pick next Tue, Wed, or Thu from "today"
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+  const targetDay = [2, 3, 4][hash % 3]; // 2=Tue, 3=Wed, 4=Thu
+  let daysUntil = targetDay - dayOfWeek;
+  if (daysUntil <= 0) daysUntil += 7; // Next week if today is past target
+
+  const sendDate = new Date(now);
+  sendDate.setDate(sendDate.getDate() + daysUntil);
+
+  // Time: 9:00 + random offset up to 120 minutes (9-11 AM window), ±15min
+  const minuteOffset = (hash % 120) + Math.round(hash * 0.7) % 30 - 15;
+  sendDate.setHours(9, 0, 0, 0);
+  sendDate.setMinutes(Math.max(0, Math.min(59, minuteOffset)));
+
+  // Format as ISO-like but readable: YYYY-MM-DD HH:MM
+  const y = sendDate.getFullYear();
+  const M = String(sendDate.getMonth() + 1).padStart(2, "0");
+  const d = String(sendDate.getDate()).padStart(2, "0");
+  const h = String(sendDate.getHours()).padStart(2, "0");
+  const m = String(sendDate.getMinutes()).padStart(2, "0");
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${days[sendDate.getDay()]} ${y}-${M}-${d} ${h}:${m}`;
 }
 
 // Streaming download — builds chunks to avoid one giant in-memory string
@@ -165,7 +199,7 @@ function buildReachInboxRows(rows: CsvRow[], emails: GeneratedEmail[], mappings:
   const modeH = mode === "icebreaker" ? ["icebreaker"]
     : mode === "sequence" ? ["subject_step1","body_step1","subject_step2","body_step2","subject_step3","body_step3","word_count"]
     : ["subject_step1","body_step1","word_count"];
-  const headers = [...baseH, ...modeH, "status"];
+  const headers = [...baseH, ...modeH, "status", "recommended_send_time"];
 
   const lines = emails.map(e => {
     const row = rows[e.rowIndex] || {};
@@ -175,28 +209,30 @@ function buildReachInboxRows(rows: CsvRow[], emails: GeneratedEmail[], mappings:
     if (mode === "icebreaker")   modeVals = [e.icebreaker||e.body||""];
     else if (mode === "sequence") modeVals = [e.subject||"", e.body||"", e.subject2||"", e.body2||"", e.subject3||"", e.body3||"", String(wordCount(e.body))];
     else                          modeVals = [e.subject||"", e.body||"", String(wordCount(e.body))];
-    return [...base, ...modeVals, e.error ? "error" : "ok"].map(v => sanitize(String(v))).join(",");
+    return [...base, ...modeVals, e.error ? "error" : "ok", recommendedSendTime(row[emailCol]||"")].map(v => sanitize(String(v))).join(",");
   });
 
   return { headers, lines };
 }
 
-function buildFullRows(rows: CsvRow[], emails: GeneratedEmail[], mode: EmailMode) {
+function buildFullRows(rows: CsvRow[], emails: GeneratedEmail[], mode: EmailMode, mappings?: FieldMapping[]) {
   const csvCols = rows[0] ? Object.keys(rows[0]) : [];
   const extraH = mode === "sequence"
-    ? ["generated_subject_1","generated_body_1","generated_subject_2","generated_body_2","generated_subject_3","generated_body_3","word_count","quality","status"]
-    : mode === "icebreaker" ? ["icebreaker","status"]
-    : ["generated_subject","generated_body","word_count","quality","status"];
+    ? ["generated_subject_1","generated_body_1","generated_subject_2","generated_body_2","generated_subject_3","generated_body_3","word_count","quality","status","recommended_send_time"]
+    : mode === "icebreaker" ? ["icebreaker","status","recommended_send_time"]
+    : ["generated_subject","generated_body","word_count","quality","status","recommended_send_time"];
 
   const lines = emails.map(e => {
     const row = rows[e.rowIndex] || {};
     const base = csvCols.map(h => sanitize(row[h]||""));
     const wc = wordCount(e.body||"");
     const quality = !e.error && e.subject && e.body && wc >= 15 && wc <= 200 ? "ok" : "review";
+    const emailCol = mappings ? getCol(mappings, "email") : "";
+    const emailVal = row[emailCol] || "";
     let extra: string[];
-    if (mode === "sequence") extra = [e.subject,e.body,e.subject2||"",e.body2||"",e.subject3||"",e.body3||"",String(wc),quality,e.error?"error":"ok"].map(v=>sanitize(v));
-    else if (mode === "icebreaker") extra = [sanitize(e.icebreaker||e.body||""), e.error?"error":"ok"];
-    else extra = [e.subject,e.body,String(wc),quality,e.error?"error":"ok"].map(v=>sanitize(v));
+    if (mode === "sequence") extra = [e.subject,e.body,e.subject2||"",e.body2||"",e.subject3||"",e.body3||"",String(wc),quality,e.error?"error":"ok",recommendedSendTime(emailVal)].map(v=>sanitize(v));
+    else if (mode === "icebreaker") extra = [sanitize(e.icebreaker||e.body||""), e.error?"error":"ok", sanitize(recommendedSendTime(emailVal))];
+    else extra = [e.subject,e.body,String(wc),quality,e.error?"error":"ok",recommendedSendTime(emailVal)].map(v=>sanitize(v));
     return [...base,...extra].join(",");
   });
 
@@ -303,6 +339,64 @@ export default function GenerationPanel({ csvRows, mappings, genState, mode, qua
         ))}
       </div>
 
+      {/* Phase 6.1 — Spam score check */}
+      {(() => {
+        const doneEmails = genState.emails.filter(e => !e.error && e.subject);
+        if (doneEmails.length < 1) return null;
+        const spamResults = doneEmails.map(e => ({
+          ...analyzeSpamScore(e.subject, e.body),
+          rowIndex: e.rowIndex,
+        }));
+        const highRisk = spamResults.filter(r => r.verdict === "high_risk");
+        const risky = spamResults.filter(r => r.verdict === "risky");
+        if (highRisk.length === 0 && risky.length === 0) return null;
+
+        return (
+          <div style={{
+            background: highRisk.length > 0 ? "#1a0505" : "#1a1000",
+            border: `1px solid ${highRisk.length > 0 ? "#3a1515" : "#3a2a00"}`,
+            padding: "12px 16px",
+            marginBottom: "10px",
+            fontSize: "11px",
+            lineHeight: 1.6,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ color: highRisk.length > 0 ? "#ff6b6b" : "#ff9500", fontWeight: 500, letterSpacing: "1px" }}>
+                ⚠ SPAM CHECK
+              </span>
+              <span style={{ color: "#888", fontSize: "10px" }}>
+                {highRisk.length} high-risk · {risky.length} risky · {doneEmails.length - highRisk.length - risky.length} safe
+              </span>
+            </div>
+            {highRisk.length > 0 && (
+              <div style={{ marginBottom: "4px", color: "#ff6b6b" }}>
+                {highRisk.length} email{(highRisk.length > 1 ? "s" : "")} flagged as high spam risk (score ≥70). Review before sending:
+              </div>
+            )}
+            {highRisk.slice(0, 5).map(r => (
+              <div key={r.rowIndex} style={{
+                padding: "6px 10px",
+                marginBottom: "4px",
+                background: "#111",
+                borderLeft: "2px solid #ff3b3b",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "#e8e8e0" }}>
+                  <span>Row {r.rowIndex! + 1} · Score <strong style={{ color: "#ff3b3b" }}>{r.score}</strong></span>
+                  <span style={{ color: "#888", fontSize: "10px" }}>
+                    {r.flags.filter(f => f.severity === "high").map(f => f.name.replace(/_/g, " ").toLowerCase()).join(", ")}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {highRisk.length > 5 && (
+              <div style={{ color: "#666", fontSize: "10px", marginTop: "2px" }}>
+                +{highRisk.length - 5} more high-risk emails
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Auto-reconnect notice */}
       {status === "paused" && failed > 0 && done < (total || 1) && (
         <div style={{ background: "#1a0a00", border: "1px solid #3a2000", padding: "10px 16px", marginBottom: "10px", fontSize: "11px", color: "#ff9500", display: "flex", gap: "10px", alignItems: "center" }}>
@@ -380,7 +474,7 @@ export default function GenerationPanel({ csvRows, mappings, genState, mode, qua
             </button>
             <button
               onClick={() => {
-                const { headers, lines } = buildFullRows(csvRows, okEmails, mode);
+                const { headers, lines } = buildFullRows(csvRows, okEmails, mode, mappings);
                 downloadCSVStreaming(headers, lines, `emails-full-${dateStr}.csv`);
               }}
               style={{ background: "#0a1a0a", color: "#44ff88", border: "1px solid #1a3a1a", padding: "9px 18px", fontSize: "12px" }}

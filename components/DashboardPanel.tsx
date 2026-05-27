@@ -260,6 +260,84 @@ export default function DashboardPanel({ onBack, onNext }: Props) {
           </div>
 
           {/* Recommendations panel */}
+
+          {/* Phase 6.3 — Deliverability Health */}
+          {(() => {
+            const br = metrics.overallBounceRate;
+            const oR = metrics.overallOpenRate;
+            const rr = metrics.overallReplyRate;
+            const sent = metrics.totalSent;
+
+            // Composite health score 0-100
+            const bounceScore = br < 0.02 ? 40 : br < 0.05 ? 30 : br < 0.10 ? 15 : 0;
+            const openScore = oR > 0.30 ? 30 : oR > 0.22 ? 20 : oR > 0.15 ? 10 : 0;
+            const replyScore = rr > 0.05 ? 30 : rr > 0.03 ? 20 : rr > 0.01 ? 10 : 0;
+            const healthScore = bounceScore + openScore + replyScore;
+
+            const healthLabel = healthScore >= 80 ? "EXCELLENT" : healthScore >= 60 ? "GOOD" : healthScore >= 35 ? "FAIR" : "POOR";
+            const healthColor = healthScore >= 80 ? "#44ff88" : healthScore >= 60 ? "#44aaff" : healthScore >= 35 ? "#ff9500" : "#ff3b3b";
+
+            return (
+              <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", padding: "12px 18px", marginBottom: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "11px", color: "#44aaff", letterSpacing: "1px", fontWeight: 500 }}>
+                    DELIVERABILITY HEALTH
+                  </span>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: healthColor }}>
+                    {healthScore}/100 · {healthLabel}
+                  </span>
+                </div>
+
+                {/* Health bar */}
+                <div style={{ background: "#1a1a1a", height: "4px", borderRadius: "2px", marginBottom: "12px" }}>
+                  <div style={{
+                    background: healthColor,
+                    height: "100%",
+                    width: `${healthScore}%`,
+                    borderRadius: "2px",
+                    transition: "width 0.5s",
+                  }} />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                  {/* Bounce rate */}
+                  <div style={{ background: "#0f0f0f", border: "1px solid #222", padding: "10px 12px" }}>
+                    <div style={{ fontSize: "10px", color: "#555", letterSpacing: "1px", marginBottom: "4px" }}>BOUNCE RATE</div>
+                    <div className="syne" style={{ fontSize: "20px", fontWeight: 700, color: br < 0.02 ? "#44ff88" : br < 0.05 ? "#ff9500" : "#ff3b3b" }}>
+                      {fmt(br)}%
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+                      target &lt;2% · {metrics.totalBounced.toLocaleString()} of {sent.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* Open rate */}
+                  <div style={{ background: "#0f0f0f", border: "1px solid #222", padding: "10px 12px" }}>
+                    <div style={{ fontSize: "10px", color: "#555", letterSpacing: "1px", marginBottom: "4px" }}>OPEN RATE</div>
+                    <div className="syne" style={{ fontSize: "20px", fontWeight: 700, color: oR > 0.25 ? "#44ff88" : oR > 0.15 ? "#ff9500" : "#ff3b3b" }}>
+                      {fmt(oR)}%
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+                      target &gt;25% · {metrics.totalOpened.toLocaleString()} of {sent.toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* Reply rate */}
+                  <div style={{ background: "#0f0f0f", border: "1px solid #222", padding: "10px 12px" }}>
+                    <div style={{ fontSize: "10px", color: "#555", letterSpacing: "1px", marginBottom: "4px" }}>REPLY RATE</div>
+                    <div className="syne" style={{ fontSize: "20px", fontWeight: 700, color: rr > 0.03 ? "#44ff88" : rr > 0.01 ? "#ff9500" : "#ff3b3b" }}>
+                      {fmt(rr)}%
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+                      target &gt;3% · {metrics.totalReplied.toLocaleString()} of {sent.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Recommendations panel */}
           {metrics.recommendations.length > 0 && (
             <div style={{ background: "#0a0a1a", border: "1px solid #1a1a3a", padding: "12px 18px", marginBottom: "14px" }}>
               <div style={{ fontSize: "11px", color: "#44aaff", letterSpacing: "1px", marginBottom: "6px", fontWeight: 500 }}>RECOMMENDATIONS</div>
