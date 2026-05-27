@@ -46,6 +46,7 @@ if (!REOON_KEY) {
   console.error("Missing REOON_API_KEY env var — set it in .env");
   process.exit(1);
 }
+const REOON_MODE = "power";
 
 // Already-shipped emails (don't double-message anyone from Batch #1)
 const BATCH1_PROD = process.env.PREVIOUS_BATCH;
@@ -457,7 +458,7 @@ function spinSubject(subject, day, firstName) {
 
 // ─── STAGE 4: REOON VERIFY ─────────────────────────────────────────────────
 async function verifyReoon(email) {
-  const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&key=${REOON_KEY}&mode=quick`;
+  const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&key=${REOON_KEY}&mode=${REOON_MODE}`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return { status: "api_error", code: res.status };
