@@ -62,6 +62,16 @@ interface Provider {
 function buildProviders(config: Record<string, string>): Provider[] {
   const providers: Provider[] = [];
 
+  // Phase 3: Tiered model providers
+  // DeepSeek V3 — best for creative steps (step1, step3)
+  if (config.deepseekKey) {
+    providers.push({ name: "DeepSeek", type: "openai", baseUrl: "https://api.deepseek.com", model: "deepseek-chat", apiKey: config.deepseekKey });
+  }
+  // OpenRouter — access to GPT-4o, gpt-4o-mini, and fallbacks
+  if (config.openrouterKey) {
+    providers.push({ name: "OpenRouter", type: "openai", baseUrl: "https://openrouter.ai/api/v1", model: "openai/gpt-4o", apiKey: config.openrouterKey });
+  }
+
   // Groq
   if (config.groqKey) {
     providers.push({ name: "Groq", type: "openai", baseUrl: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", apiKey: config.groqKey });
@@ -88,6 +98,25 @@ function buildProviders(config: Record<string, string>): Provider[] {
     } else {
       providers.push({ name: "Local", type: "openai", baseUrl: config.baseUrl, model: config.model, apiKey: "lm-studio" });
     }
+  }
+
+  // Reorder providers based on step preference
+  // Step1/Step3 prefer DeepSeek; Step2 prefers GPT-4o via OpenRouter; Step4 prefers cheap model
+  const step = config.step || "step1";
+  const preferredName: Record<string, string> = {
+    step1: "DeepSeek",
+    step2: "OpenRouter",
+    step3: "DeepSeek",
+    step4: "OpenRouter", // will use gpt-4o-mini as model
+  };
+
+  const preferred = preferredName[step];
+  if (preferred) {
+    // Move preferred provider to front, keep relative order of others
+    const prefs = providers.filter(p => p.name === preferred);
+    const others = providers.filter(p => p.name !== preferred);
+    providers.length = 0;
+    providers.push(...prefs, ...others);
   }
 
   return providers;
@@ -156,6 +185,24 @@ export async function POST(req: NextRequest) {
     const providers = buildProviders(config);
     if (providers.length === 0) {
       return NextResponse.json({ error: "No providers configured. Add API keys in Step 1." }, { status: 400 });
+    }
+
+    // Step-specific model overrides
+    // Step 4: use gpt-4o-mini on OpenRouter (cheaper, good for short breakups)
+    if (step === "step4") {
+      for (const p of providers) {
+        if (p.name === "OpenRouter" && p.model === "openai/gpt-4o") {
+          p.model = "openai/gpt-4o-mini";
+        }
+      }
+    }
+    // Step 2: GPT-4o for social proof (needs strong evidence writing)
+    if (step === "step2") {
+      for (const p of providers) {
+        if (p.name === "OpenRouter" && p.model === "openai/gpt-4o-mini") {
+          p.model = "openai/gpt-4o";
+        }
+      }
     }
 
     // Round-robin: start from next provider in sequence

@@ -72,6 +72,14 @@ export default function ConfigPanel({ config, onChange, onNext }: Props) {
             <input {...inp} type="password" value={config.geminiKey || ""} onChange={e => set("geminiKey", e.target.value)} placeholder="AIza... (free at ai.google.dev)" />
           </div>
           <div>
+            {label("DEEPSEEK API KEY (sk-...)")}
+            <input {...inp} type="password" value={config.deepseekKey || ""} onChange={e => set("deepseekKey", e.target.value)} placeholder="sk-... (platform.deepseek.com)" />
+          </div>
+          <div>
+            {label("OPENROUTER API KEY")}
+            <input {...inp} type="password" value={config.openrouterKey || ""} onChange={e => set("openrouterKey", e.target.value)} placeholder="sk-or-... (openrouter.ai/keys)" />
+          </div>
+          <div>
             {label("LOCAL LM STUDIO URL")}
             <input {...inp} value={config.localUrl || ""} onChange={e => set("localUrl", e.target.value)} placeholder="http://192.168.4.59:1234/v1" />
           </div>
@@ -81,7 +89,7 @@ export default function ConfigPanel({ config, onChange, onNext }: Props) {
           </div>
         </div>
         <div style={{ fontSize: "10px", color: "#3a5a3a", marginTop: "8px" }}>
-          Active providers: {[config.groqKey && "Groq", config.geminiKey && "Gemini", config.localUrl && "Local"].filter(Boolean).join(" → ") || "None configured"}
+          Active providers: {[config.groqKey && "Groq", config.geminiKey && "Gemini", config.deepseekKey && "DeepSeek", config.openrouterKey && "OpenRouter", config.localUrl && "Local"].filter(Boolean).join(" → ") || "None configured"}
         </div>
       </div>
 

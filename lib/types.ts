@@ -14,6 +14,9 @@ export interface LMConfig {
   geminiModel: string;   // e.g. gemini-flash-latest
   localUrl: string;      // Local LM Studio URL
   localModel: string;    // Local model name
+  // Phase 3: Tiered model providers
+  deepseekKey: string;   // DeepSeek API key (sk-...)
+  openrouterKey: string; // OpenRouter API key
 }
 
 export type CloudProvider = "groq" | "together" | "openrouter" | "local";
@@ -60,6 +63,8 @@ export const DEFAULT_LM_CONFIG: LMConfig = {
   geminiModel: "gemini-flash-latest",
   localUrl: "http://192.168.4.59:1234/v1",
   localModel: "google/gemma-4-e4b",
+  deepseekKey: "",
+  openrouterKey: "",
 };
 
 export function isClaudeModel(model: string): boolean {
