@@ -10,10 +10,10 @@ export const maxDuration = 300;
 // Actual providers configured in Phase 3 — here we define the routing logic.
 
 const STEP_MODEL_MAP: Record<string, { recommended: string; fallback: string; minTokens: number; temp: number }> = {
-  step1: { recommended: "deepseek", fallback: "gpt4o", minTokens: 350, temp: 0.75 },
-  step2: { recommended: "gpt4o", fallback: "deepseek", minTokens: 400, temp: 0.7 },
-  step3: { recommended: "deepseek", fallback: "gpt4o", minTokens: 350, temp: 0.72 },
-  step4: { recommended: "minifast", fallback: "gpt4o", minTokens: 250, temp: 0.65 },
+  step1: { recommended: "deepseek", fallback: "deepseek", minTokens: 350, temp: 0.75 },
+  step2: { recommended: "deepseek", fallback: "deepseek", minTokens: 400, temp: 0.7 },
+  step3: { recommended: "deepseek", fallback: "deepseek", minTokens: 350, temp: 0.72 },
+  step4: { recommended: "deepseek", fallback: "deepseek", minTokens: 250, temp: 0.65 },
 };
 
 // ─── BAN LIST (fast client-side check before quality gate) ────────────────────
@@ -101,14 +101,13 @@ function buildProviders(config: Record<string, string>): Provider[] {
     }
   }
 
-  // Reorder providers based on step preference
-  // Step1/Step3 prefer DeepSeek; Step2 prefers GPT-4o via OpenRouter; Step4 prefers cheap model
+  // Reorder providers — all steps prefer DeepSeek now
   const step = config.step || "step1";
   const preferredName: Record<string, string> = {
     step1: "DeepSeek",
-    step2: "OpenRouter",
+    step2: "DeepSeek",
     step3: "DeepSeek",
-    step4: "OpenRouter", // will use gpt-4o-mini as model
+    step4: "DeepSeek",
   };
 
   const preferred = preferredName[step];
@@ -189,24 +188,6 @@ export async function POST(req: NextRequest) {
     const providers = buildProviders(config);
     if (providers.length === 0) {
       return NextResponse.json({ error: "No providers configured. Add API keys in Step 1." }, { status: 400 });
-    }
-
-    // Step-specific model overrides
-    // Step 4: use gpt-4o-mini on OpenRouter (cheaper, good for short breakups)
-    if (step === "step4") {
-      for (const p of providers) {
-        if (p.name === "OpenRouter" && p.model === "openai/gpt-4o") {
-          p.model = "openai/gpt-4o-mini";
-        }
-      }
-    }
-    // Step 2: GPT-4o for social proof (needs strong evidence writing)
-    if (step === "step2") {
-      for (const p of providers) {
-        if (p.name === "OpenRouter" && p.model === "openai/gpt-4o-mini") {
-          p.model = "openai/gpt-4o";
-        }
-      }
     }
 
     // Round-robin: start from next provider in sequence
