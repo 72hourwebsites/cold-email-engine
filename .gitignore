@@ -1,0 +1,9 @@
+node_modules/
+.next/
+*.log
+scripts/*.log
+scripts/batch2-state/
+scripts/overnight-progress.json
+scripts/sequence-progress.json
+.env
+.env.local

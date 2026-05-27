@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #0f0f0f;
+  --surface2: #111;
+  --surface3: #1a1a1a;
+  --border: #222;
+  --border2: #2a2a2a;
+  --text: #e8e8e0;
+  --muted: #555;
+  --muted2: #444;
+  --green: #44ff88;
+  --yellow: #e8ff00;
+  --red: #ff3b3b;
+  --blue: #44aaff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "DM Mono", monospace;
+  margin: 0;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+textarea, input, select {
+  font-family: "DM Mono", monospace;
+  background: var(--surface3);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  outline: none;
+}
+textarea:focus, input:focus, select:focus {
+  border-color: var(--green);
+}
+
+button { font-family: "DM Mono", monospace; cursor: pointer; }
+
+.syne { font-family: "Syne", sans-serif; }
