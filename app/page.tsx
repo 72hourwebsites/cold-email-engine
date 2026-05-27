@@ -15,9 +15,11 @@ import CsvUpload from "@/components/CsvUpload";
 import FieldMapper from "@/components/FieldMapper";
 import PromptBuilder from "@/components/PromptBuilder";
 import GenerationPanel from "@/components/GenerationPanel";
+import DashboardPanel from "@/components/DashboardPanel";
+import ABTestPanel from "@/components/ABTestPanel";
 
-type Step = 1 | 2 | 3 | 4 | 5;
-const STEP_LABELS = ["LM CONFIG", "UPLOAD CSV", "MAP FIELDS", "WRITE PROMPT", "GENERATE"];
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+const STEP_LABELS = ["LM CONFIG", "UPLOAD CSV", "MAP FIELDS", "WRITE PROMPT", "GENERATE", "DASHBOARD", "AB TEST"];
 const CONFIG_KEY  = "cold_email_lm_config_v1";
 const SESSION_KEY = "cold_email_session_v1";
 const BATCH_FLUSH = 5;
@@ -385,7 +387,10 @@ export default function Home() {
     bad: genState.emails.filter(e => !isGoodEmail(e) && !e.error).length,
   };
 
-  const canProceed = [true, csvRowCount > 0, mappings.some(m => m.semanticKey), true, true];
+  const canProceed = [true, csvRowCount > 0, mappings.some(m => m.semanticKey), true, true, true, true];
+
+  // Step 6: if no CSV loaded but they click dashboard, still allow it
+  const step6Enabled = true; // Dashboard is always accessible
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a" }}>
@@ -399,16 +404,17 @@ export default function Home() {
             const s = (i + 1) as Step;
             const active = step === s;
             const done = step > s;
+            const enabled = s === 6 ? step6Enabled : (done || canProceed[i]);
             return (
-              <button key={s} onClick={() => (done || canProceed[i]) && setStep(s)}
+              <button key={s} onClick={() => enabled && setStep(s)}
                 style={{
                   background: active ? "#e8ff00" : done ? "#1a3a00" : "#111",
                   color: active ? "#000" : done ? "#44ff88" : "#444",
                   border: `1px solid ${active ? "#e8ff00" : done ? "#44ff88" : "#222"}`,
                   padding: "6px 12px", fontSize: "10px", letterSpacing: "1px", fontWeight: active ? 500 : 400,
-                  cursor: (done || active || canProceed[i]) ? "pointer" : "not-allowed",
+                  cursor: enabled ? "pointer" : "not-allowed",
                 }}>
-                {done ? "✓ " : `${s}. `}{label}
+                {done ? "✓ " : ""}{s}. {label}
               </button>
             );
           })}
@@ -448,6 +454,17 @@ export default function Home() {
             onUpdateEmail={updateEmail}
             onReset={resetGeneration}
             onBack={() => setStep(4)}
+          />
+        )}
+        {step === 6 && (
+          <DashboardPanel
+            onBack={() => setStep(5)}
+            onNext={() => setStep(7)}
+          />
+        )}
+        {step === 7 && (
+          <ABTestPanel
+            onBack={() => setStep(6)}
           />
         )}
       </div>

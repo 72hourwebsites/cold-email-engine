@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { assignVariant } from "@/lib/ab-testing";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -174,8 +175,11 @@ async function callProvider(prompt: string, systemPrompt: string, p: Provider, m
 // ─── MAIN ROUTE ───────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, systemPrompt, config } = await req.json();
+    const { prompt, systemPrompt, config, email } = await req.json();
     const step = config.step || "step1";
+
+    // Phase 5: A/B test variant assignment
+    const variant = email ? assignVariant(email, step) : "A";
 
     // Step-aware model tiering
     const stepConfig = STEP_MODEL_MAP[step] || STEP_MODEL_MAP.step1;
@@ -263,7 +267,7 @@ export async function POST(req: NextRequest) {
       } catch { /* use last good version */ }
     }
 
-    return NextResponse.json({ subject, body, raw, step, quality: gate });
+    return NextResponse.json({ subject, body, raw, step, variant, quality: gate });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
