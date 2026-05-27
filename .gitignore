@@ -44,3 +44,14 @@ cold-email-reachinbox-*.csv
 cold-email-reachinbox-*.CSV
 *.REJECTED.csv
 *.DROPPED.csv
+
+# generated state files (may contain email addresses)
+dashboard-state.json
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
